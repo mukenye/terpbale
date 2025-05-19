@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://<your-server-deployment>.vercel.app/api/$1"
+      "destination": "https://terpbale.vercel.app/api/events"
     }
   ]
 }
