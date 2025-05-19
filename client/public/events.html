@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TerpBale — Events</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Chart.js (extra‐credit JS lib) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="events.html">Events</a>
+  </nav>
+
+  <main class="container">
+    <h1>Events</h1>
+    <ul id="events-list"></ul>
+
+    <h2>Events by Date</h2>
+    <canvas id="events-chart" width="400" height="200"></canvas>
+  </main>
+
+  <script>
+    let eventsData = [];
+    fetch('/api/events')
+      .then(res => res.json())
+      .then(events => {
+        eventsData = events;
+        const ul = document.getElementById('events-list');
+        events.forEach(e => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <strong>${e.title}</strong> — ${new Date(e.start_time).toLocaleString()}
+            <button data-id="${e.id}">RSVP</button>
+          `;
+          ul.append(li);
+        });
+
+        // RSVP button handlers
+        document.querySelectorAll('#events-list button').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            fetch('/api/rsvp', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ event_id: Number(id), user_id: 'demo-user' })
+            })
+            .then(res => res.json())
+            .then(data => alert(`RSVP recorded: ${JSON.stringify(data)}`))
+            .catch(console.error);
+          });
+        });
+
+        // Build a simple chart: count events per day
+        const counts = events.reduce((acc, e) => {
+          const d = new Date(e.start_time).toLocaleDateString();
+          acc[d] = (acc[d] || 0) + 1;
+          return acc;
+        }, {});
+        const labels = Object.keys(counts);
+        const data = Object.values(counts);
+        new Chart(
+          document.getElementById('events-chart'),
+          {
+            type: 'bar',
+            data: { labels, datasets: [{ label: '# events', data }] }
+          }
+        );
+      })
+      .catch(console.error);
+  </script>
+</body>
+</html>
