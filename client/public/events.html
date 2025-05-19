@@ -24,12 +24,35 @@
   </main>
 
   <script>
+    // Environment-aware API base URL
+    const API_BASE = window.location.hostname === 'localhost' 
+      ? '' 
+      : 'https://terpbale.vercel.app';
+
     let eventsData = [];
-    fetch('/api/events')
-      .then(res => res.json())
+    
+    // Main fetch call with dynamic URL
+    fetch(`${API_BASE}/api/events`)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then(events => {
         eventsData = events;
         const ul = document.getElementById('events-list');
+        
+        // Clear any existing error messages
+        ul.innerHTML = '';
+        
+        // Handle empty events case
+        if (events.length === 0) {
+          ul.innerHTML = '<li>No upcoming events found</li>';
+          return;
+        }
+
+        // Populate events list
         events.forEach(e => {
           const li = document.createElement('li');
           li.innerHTML = `
@@ -43,34 +66,56 @@
         document.querySelectorAll('#events-list button').forEach(btn => {
           btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-id');
-            fetch('/api/rsvp', {
+            fetch(`${API_BASE}/api/rsvp`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ event_id: Number(id), user_id: 'demo-user' })
             })
-            .then(res => res.json())
+            .then(res => {
+              if (!res.ok) {
+                throw new Error(`RSVP failed: ${res.status}`);
+              }
+              return res.json();
+            })
             .then(data => alert(`RSVP recorded: ${JSON.stringify(data)}`))
-            .catch(console.error);
+            .catch(err => {
+              console.error('RSVP error:', err);
+              alert('Failed to RSVP. Please try again.');
+            });
           });
         });
 
-        // Build a simple chart: count events per day
+        // Build chart data
         const counts = events.reduce((acc, e) => {
           const d = new Date(e.start_time).toLocaleDateString();
           acc[d] = (acc[d] || 0) + 1;
           return acc;
         }, {});
+        
         const labels = Object.keys(counts);
         const data = Object.values(counts);
+        
+        // Initialize chart
         new Chart(
           document.getElementById('events-chart'),
           {
             type: 'bar',
-            data: { labels, datasets: [{ label: '# events', data }] }
+            data: { 
+              labels, 
+              datasets: [{ 
+                label: '# events', 
+                data,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)'
+              }] 
+            }
           }
         );
       })
-      .catch(console.error);
+      .catch(err => {
+        console.error('Error loading events:', err);
+        document.getElementById('events-list').innerHTML = 
+          `<li>Error loading events: ${err.message}</li>`;
+      });
   </script>
 </body>
 </html>
