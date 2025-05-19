@@ -24,68 +24,96 @@
   </main>
 
   <script>
-    // Environment-aware API base URL
+    // Enhanced environment detection with debugging
     const API_BASE = window.location.hostname === 'localhost' 
-      ? '' 
-      : 'https://terpbale.vercel.app';
+      ? 'http://localhost:4000'  // Explicit local development URL
+      : window.location.origin;  // Automatic production URL
+
+    console.log('API Base URL:', API_BASE);  // Debugging aid
 
     let eventsData = [];
     
-    // Main fetch call with dynamic URL
+    // Main fetch call with enhanced error handling
     fetch(`${API_BASE}/api/events`)
       .then(res => {
+        console.log('API Response Status:', res.status);  // Debug log
         if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
+          throw new Error(`Server returned ${res.status} status`);
         }
         return res.json();
       })
       .then(events => {
+        console.log('Received events:', events);  // Debug log
         eventsData = events;
         const ul = document.getElementById('events-list');
         
-        // Clear any existing error messages
+        // Clear previous content
         ul.innerHTML = '';
         
         // Handle empty events case
         if (events.length === 0) {
-          ul.innerHTML = '<li>No upcoming events found</li>';
+          ul.innerHTML = '<li class="info">No upcoming events found</li>';
           return;
         }
 
-        // Populate events list
+        // Populate events list with better formatting
         events.forEach(e => {
           const li = document.createElement('li');
+          li.className = 'event-item';
           li.innerHTML = `
-            <strong>${e.title}</strong> — ${new Date(e.start_time).toLocaleString()}
-            <button data-id="${e.id}">RSVP</button>
+            <div class="event-details">
+              <strong class="event-title">${e.title}</strong>
+              <span class="event-time">${new Date(e.start_time).toLocaleString()}</span>
+            </div>
+            <button class="rsvp-button" data-id="${e.id}">RSVP</button>
           `;
           ul.append(li);
         });
 
-        // RSVP button handlers
-        document.querySelectorAll('#events-list button').forEach(btn => {
+        // Enhanced RSVP button handlers
+        document.querySelectorAll('#events-list .rsvp-button').forEach(btn => {
           btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-id');
+            const spinner = document.createElement('span');
+            spinner.className = 'spinner';
+            btn.disabled = true;
+            btn.innerHTML = 'Processing... ';
+            btn.appendChild(spinner);
+            
             fetch(`${API_BASE}/api/rsvp`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ event_id: Number(id), user_id: 'demo-user' })
+              body: JSON.stringify({ 
+                event_id: Number(id), 
+                user_id: 'demo-user',
+                timestamp: new Date().toISOString()
+              })
             })
             .then(res => {
               if (!res.ok) {
-                throw new Error(`RSVP failed: ${res.status}`);
+                throw new Error(`RSVP failed with status ${res.status}`);
               }
               return res.json();
             })
-            .then(data => alert(`RSVP recorded: ${JSON.stringify(data)}`))
+            .then(data => {
+              btn.innerHTML = '✓ RSVP Confirmed';
+              setTimeout(() => {
+                btn.innerHTML = 'RSVP';
+                btn.disabled = false;
+              }, 2000);
+            })
             .catch(err => {
               console.error('RSVP error:', err);
-              alert('Failed to RSVP. Please try again.');
+              btn.innerHTML = 'Failed - Try Again';
+              btn.disabled = false;
+              setTimeout(() => {
+                btn.innerHTML = 'RSVP';
+              }, 1500);
             });
           });
         });
 
-        // Build chart data
+        // Enhanced chart with better visuals
         const counts = events.reduce((acc, e) => {
           const d = new Date(e.start_time).toLocaleDateString();
           acc[d] = (acc[d] || 0) + 1;
@@ -95,7 +123,6 @@
         const labels = Object.keys(counts);
         const data = Object.values(counts);
         
-        // Initialize chart
         new Chart(
           document.getElementById('events-chart'),
           {
@@ -103,19 +130,87 @@
             data: { 
               labels, 
               datasets: [{ 
-                label: '# events', 
+                label: 'Events per Day', 
                 data,
-                backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
               }] 
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: {
+                  position: 'top',
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    stepSize: 1
+                  }
+                }
+              }
             }
           }
         );
       })
       .catch(err => {
         console.error('Error loading events:', err);
-        document.getElementById('events-list').innerHTML = 
-          `<li>Error loading events: ${err.message}</li>`;
+        document.getElementById('events-list').innerHTML = `
+          <li class="error">
+            Failed to load events. 
+            <button onclick="window.location.reload()">Retry</button>
+            <div><small>${err.message}</small></div>
+            <div><small>Tried: ${API_BASE}/api/events</small></div>
+          </li>
+        `;
       });
   </script>
+
+  <style>
+    /* Added some basic styles for the new elements */
+    .event-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.8rem;
+      border-bottom: 1px solid #eee;
+    }
+    .rsvp-button {
+      padding: 0.3rem 0.8rem;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .rsvp-button:disabled {
+      background: #cccccc;
+    }
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .error {
+      color: #d32f2f;
+      padding: 1rem;
+      background: #ffebee;
+      border-radius: 4px;
+    }
+    .info {
+      color: #1976d2;
+      padding: 1rem;
+    }
+  </style>
 </body>
 </html>
