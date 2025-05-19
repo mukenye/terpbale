@@ -103,6 +103,7 @@ npm test
 
   * RSVP alert is basic and may not handle errors gracefully.
   * No validation on user inputs for the RSVP form.
+  * deployment issues on vercel, events page not working
 
 * **Roadmap**
 
